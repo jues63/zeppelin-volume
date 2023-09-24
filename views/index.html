@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Zepplin Volume</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="../assets/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/bootstrap-slider.css">
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.4.0/css/font-awesome.min.css">
+	<script type="text/javascript" src="../node_modules/androidjs/lib/androidjs.js"></script>
+  <script src="../assets/jquery-3.3.1.min.js"></script>
+  <script src="../assets/bootstrap-slider.min.js"></script>
+</head>
+
+<style>
+	.app{
+		font-size:30px;
+	}
+  #butScan {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+  }
+  #msg {
+    font-size: 10pt;
+    position: absolute;
+    bottom: 42px;
+    padding: 4px;
+    max-height: 100px;
+    overflow: hidden;
+  }
+  #error {
+    font-size: 10pt;
+    padding: 4px;
+    position: absolute;
+    bottom: 5px;
+    max-height: 40px;
+    overflow: hidden;
+  }
+
+  body {
+	  background: #2a2a2a;
+    color: #999;
+    font-family: Verdana;
+    background-image: url("../assets/images/background720.png");
+    background-repeat: no-repeat;
+    background-position: right top;    
+  }
+  
+  h1 {
+	  text-align: center;
+	  font-size: 30px;
+	  padding-top: 40px;
+	  color: #FFF;
+  }
+  #deviceName {
+    color: #EEE;
+  }
+  #player {
+	  width: 100%;
+	  height: 60px;
+	  position: relative;
+    padding-top: 12px;
+    border-radius: 22px;
+	  top: 70px;
+    text-align: center;
+    background-color: #444;
+	}
+  #volumeDown {
+    font-size: 20pt;
+    display: inline-block;
+    position: relative;
+    left: -16px;
+  }
+  #volumeUp {
+    font-size: 20pt;
+    display: inline-block;
+    position: relative;
+    left: 16px;
+  }
+  #volumeValue {
+    font-size: 9pt;
+    display: inline-block;
+    position: relative;
+    right:14px;
+    top: -28px;
+  }
+  #customRange1 {
+    width: 75%;
+    top: -6px;
+  }
+  #version {
+    position: absolute;
+    bottom: 12px;
+    right: 4px;
+  }
+  .slider-selection {
+	  background: #df0707;
+  }
+  .slider-track-high {
+    background: #bbb;
+  }
+  .slider-handle {
+    top: -2px;
+    width: 22px;
+    height: 22px;
+    background: #000;
+  }
+</style>
+
+<body>
+  <div id="content">
+    <h1 id="deviceName">Zeppelin</h1>
+    <div id="version">
+      <small>V 0.1.0</small>
+    </div>
+    <div>
+      <button class="btn btn-small btn-red" id="butScan">Scannen</button>
+    </div>
+    <div id="error">Error line</div>
+    <div id="msg">Message line</div>
+    
+    <div id="player">
+      <div id="volume">
+        <div id="volumeDown">
+          <i class="fa fa-volume-down"></i>
+        </div>  
+        <input id="customRange1" data-slider-id='customRange1' type="text" data-slider-min="0" data-slider-max="100" data-slider-step="1" data-slider-value="14"/>
+        <div id="volumeUp">
+          <i class="fa fa-volume-up"></i>
+        </div>
+        <div id="volumeValue">14</div>
+      </div>  
+    </div>  
+  </div>  
+
+<script>
+  let volumeSlider = null;
+  let upnpDevices = [];
+  let mediaRenderDevices = [];
+  let mediaServerDevices = [];
+
+  window.onload = function() {
+
+    startDeviceScan();
+
+    $("#butScan").click(function(){
+      startDeviceScan();
+    })
+    front.on('error', (msg) => {
+      console.error("error", msg);
+      $("#error").html(msg);
+    });
+    front.on('msg', (msg) => {
+      console.log("msg", msg);
+      $("#msg").html(msg+"<br />"+$("#msg").html());
+    });
+    front.on('debug-msg', (msg) => {
+      console.log("msg", msg);
+    });
+    front.on("device-connected", function(deviceName){
+      $("#deviceName").html(deviceName)
+    });
+ 
+    front.on('device-found', (device) => {
+      console.log(device);
+      try {
+        if(device.description && device.description.device) {
+          if (device.description.device.deviceType.indexOf("urn:schemas-upnp-org:device:MediaRenderer") != -1) {
+            console.log("media renderer (select)", device.description.device.friendlyName)
+            $("#msg").html($("#msg").html()+"<br />"+device.description.device.friendlyName);
+          
+            front.send("selectDevice", device);
+          }
+          else if (device.description.device.deviceType.indexOf("urn:schemas-upnp-org:device:MediaServer") != -1) {
+            $("#msg").html($("#msg").html()+"<br />"+device.description.device.friendlyName);
+          } else {
+            console.log(device.description.device.deviceType, device.description.device.friendlyName)
+          }
+        }
+      } catch(e) {
+        console.log("exception", e);
+        $("#error").html(e.message);
+      }
+    });
+    front.on("scan-start", (msg) => {
+      console.log("scan started", msg);
+    });
+    front.on("scan-stop", (msg) => {
+      console.log("scan stopped", msg);
+      front.send("getDevices", "");
+    });
+    front.on("devicesList", function(allDevices) {
+      console.log(allDevices);
+    });
+    front.on("getVolume", function(volume) {
+      $('#customRange1').slider('setValue', volume);
+      $("#volumeValue").html(volume);
+    });
+
+
+    volumeSlider = new Slider('#customRange1', { tooltip: "always"});
+    console.log(volumeSlider)
+    
+    $("#customRange1").change(function(event){
+      console.log("change", event.value.newValue);
+      setVolume(event.value.newValue);
+    });
+
+    $("#volumeUp").click(function() {
+      let volume = volumeSlider.getValue();
+
+      if(volume < 100) {
+        setVolume(++volume);
+      }
+    });
+    $("#volumeDown").click(function() {
+      let volume = volumeSlider.getValue();
+
+      if(volume > 0) {
+        setVolume(--volume);
+      }
+    });
+  };
+  function startDeviceScan() {
+    upnpDevices = [];
+
+    front.send("startDeviceScan", "")
+  }
+  function setVolume (volume) {
+    console.log("setVolume", volume);
+    volumeSlider.setValue(volume);
+    $("#volumeValue").html(volume);
+    front.send("setVolume",  volume);
+  }  
+</script>
+
+</body>
+
+</html>
